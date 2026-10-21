@@ -1,0 +1,11 @@
+{{- range $name, $acl := .Values.acls }}
+{{- if kindIs "invalid" $acl }}{{ continue }}{{ end }}
+{{- if not $acl.acl }}{{ fail (printf "acls.%s.acl is required" $name) }}{{ end }}
+---
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseACL
+metadata:
+  {{- include "redb.metadata" (dict "root" $ "name" $name "item" $acl "wave" -1) | nindent 2 }}
+spec:
+  acl: {{ $acl.acl | quote }}
+{{- end }}

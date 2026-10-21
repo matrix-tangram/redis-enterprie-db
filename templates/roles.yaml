@@ -1,0 +1,35 @@
+{{- range $name, $role := .Values.roles }}
+{{- if kindIs "invalid" $role }}{{ continue }}{{ end }}
+{{- if not (or $role.databases $role.databaseSelector) }}{{ fail (printf "roles.%s: set databases or databaseSelector" $name) }}{{ end }}
+---
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseRole
+metadata:
+  {{- include "redb.metadata" (dict "root" $ "name" $name "item" $role "wave" 1) | nindent 2 }}
+spec:
+  managementRole: {{ $role.managementRole | default "None" }}
+  acl:
+    {{- include "redb.aclRef" (dict "acl" $role.acl "ctx" (printf "roles.%s" $name)) | nindent 4 }}
+  scopes:
+    {{- range $role.databases }}
+    - kind: RedisEnterpriseDatabase
+      name: {{ . | quote }}
+    {{- end }}
+    {{- with $role.databaseSelector }}
+    - kind: RedisEnterpriseDatabase
+      selector:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+{{- end }}
+{{- range $name, $role := .Values.clusterRoles }}
+{{- if kindIs "invalid" $role }}{{ continue }}{{ end }}
+---
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseClusterRole
+metadata:
+  {{- include "redb.metadata" (dict "root" $ "name" $name "item" $role "wave" 1) | nindent 2 }}
+spec:
+  managementRole: {{ $role.managementRole | default "None" }}
+  acl:
+    {{- include "redb.aclRef" (dict "acl" $role.acl "ctx" (printf "clusterRoles.%s" $name)) | nindent 4 }}
+{{- end }}

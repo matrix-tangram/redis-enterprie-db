@@ -1,0 +1,101 @@
+# Every object type is a map keyed by the Kubernetes resource name, and every map is empty by default,
+# so the chart renders nothing until you add entries. Maps (not lists) let several values files
+# (e.g. a shared base plus per-environment overlays in ArgoCD) add or change single entries;
+# set an entry to null in an overlay to remove it. All objects go to the release namespace,
+# which must be the namespace of the Redis Enterprise cluster.
+
+# Name of the RedisEnterpriseCluster that databases belong to (unless a database spec sets its own)
+clusterName: rec
+
+# Labels added to every object
+commonLabels: {}
+
+# Defaults for every ExternalSecret this chart renders (user passwords and externalSecrets below)
+externalSecretDefaults:
+  refreshInterval: 1h
+  secretStoreRef: { kind: ClusterSecretStore, name: aws-secrets-manager }
+
+# Defaults for database Ingresses. TLS passthrough: the ingress controller routes by SNI and the
+# Redis Enterprise proxy terminates TLS, so the database spec needs tlsMode: enabled.
+ingressDefaults:
+  className: haproxy
+  annotations:
+    ingress.kubernetes.io/ssl-passthrough: "true"
+
+# RedisEnterpriseDatabase objects.
+#   spec:     REDB spec, rendered as is (redisEnterpriseCluster defaults to clusterName)
+#   ingress:  optional Ingress to the database service
+#     enabled: true
+#     host:    db1.db.example.com           (required)
+#     name, className, annotations (merged over ingressDefaults.annotations), servicePort (default {name: redis})
+#   labels, annotations: extra metadata
+databases: {}
+#  db1:
+#    spec:
+#      memorySize: 1GB
+#      shardCount: 2
+#      replication: true
+#      tlsMode: enabled
+#      databaseServicePort: 6379
+#    ingress:
+#      enabled: true
+#      host: db1.db.example.com
+
+# RedisEnterpriseACL objects (custom Redis ACL rules)
+#   acl: Redis ACL rule
+acls: {}
+#  read-only:
+#    acl: "+@read ~*"
+
+# RedisEnterpriseRole objects (data access to some databases).
+#   acl:              exactly one of
+#     predefined: <name of an ACL built into the cluster, e.g. "Full Access">
+#     custom:     <name of a RedisEnterpriseACL, from acls above or created elsewhere>
+#   databases:        list of RedisEnterpriseDatabase names the role applies to
+#   databaseSelector: label selector for databases (matchLabels/matchExpressions)
+#                     (at least one of databases or databaseSelector)
+#   managementRole:   DBMember, DBViewer or None (default None: no API/UI access)
+roles: {}
+#  db1-read-only:
+#    acl: { custom: read-only }
+#    databases: [db1]
+#  db1-full-access:
+#    acl: { predefined: Full Access }
+#    databases: [db1]
+
+# RedisEnterpriseRoleBinding objects
+#   role:  name of a RedisEnterpriseRole
+#   users: list of RedisEnterpriseUser names
+roleBindings: {}
+#  db1-read-only:
+#    role: db1-read-only
+#    users: [app-ro]
+
+# RedisEnterpriseClusterRole objects (access to every database in the cluster)
+#   acl:            same as for roles (predefined or custom)
+#   managementRole: Admin, ClusterMember, ClusterViewer, DBMember, DBViewer, UserManager or None (default None)
+clusterRoles: {}
+
+# RedisEnterpriseClusterRoleBinding objects
+#   role:  name of a RedisEnterpriseClusterRole
+#   users: list of RedisEnterpriseUser names
+clusterRoleBindings: {}
+
+# RedisEnterpriseUser objects.
+#   username:        defaults to the entry name
+#   passwordSecrets: names of existing Secrets with key 'password'
+#   externalSecret:  optional; renders an ExternalSecret that writes key 'password' to a Secret
+#                    and adds that Secret to passwordSecrets
+#     remoteRef:  ESO remoteRef, e.g. { key: redis/my-env/db1/app-rw, property: REDIS_PASSWORD }
+#     name:       Secret and ExternalSecret name (default <entry name>-password)
+#     refreshInterval, secretStoreRef: override externalSecretDefaults
+#   spec:            any other RedisEnterpriseUser spec fields (authMethod, passwordMode, email, ...)
+users: {}
+#  app-ro:
+#    externalSecret:
+#      remoteRef: { key: redis/my-env/db1/app-ro, property: REDIS_PASSWORD }
+
+# Any other ExternalSecret objects, e.g. connection secrets that applications load with envFrom.
+#   spec: ExternalSecret spec (refreshInterval and secretStoreRef default from externalSecretDefaults).
+#         ESO template expressions such as "{{ .REDIS_PASSWORD }}" are passed through unchanged.
+externalSecrets: {}

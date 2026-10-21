@@ -1,0 +1,30 @@
+{{- range $name, $u := .Values.users }}
+{{- if kindIs "invalid" $u }}{{ continue }}{{ end }}
+{{- $spec := deepCopy ($u.spec | default dict) }}
+{{- $_ := set $spec "username" ($u.username | default $name) }}
+{{- $secrets := list }}
+{{- range $u.passwordSecrets }}{{ $secrets = append $secrets (dict "name" .) }}{{ end }}
+{{- with $u.externalSecret }}
+{{- if not .remoteRef }}{{ fail (printf "users.%s.externalSecret.remoteRef is required" $name) }}{{ end }}
+{{- $secretName := .name | default (printf "%s-password" $name) }}
+{{- $secrets = append $secrets (dict "name" $secretName) }}
+{{- $esSpec := dict "target" (dict "name" $secretName) "data" (list (dict "secretKey" "password" "remoteRef" .remoteRef)) }}
+{{- with .refreshInterval }}{{ $_ := set $esSpec "refreshInterval" . }}{{ end }}
+{{- with .secretStoreRef }}{{ $_ := set $esSpec "secretStoreRef" . }}{{ end }}
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  {{- include "redb.metadata" (dict "root" $ "name" $secretName "item" (dict) "wave" -1) | nindent 2 }}
+spec:
+  {{- include "redb.externalSecretSpec" (dict "root" $ "spec" $esSpec) | nindent 2 }}
+{{- end }}
+{{- if $secrets }}{{ $_ := set $spec "passwordSecrets" $secrets }}{{ end }}
+---
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseUser
+metadata:
+  {{- include "redb.metadata" (dict "root" $ "name" $name "item" $u "wave" 1) | nindent 2 }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}

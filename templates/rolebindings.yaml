@@ -1,0 +1,20 @@
+{{- range $name, $b := .Values.roleBindings }}
+{{- if kindIs "invalid" $b }}{{ continue }}{{ end }}
+---
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseRoleBinding
+metadata:
+  {{- include "redb.metadata" (dict "root" $ "name" $name "item" $b "wave" 2) | nindent 2 }}
+spec:
+  {{- include "redb.bindingSpec" (dict "item" $b "kind" "RedisEnterpriseRole" "ctx" (printf "roleBindings.%s" $name)) | nindent 2 }}
+{{- end }}
+{{- range $name, $b := .Values.clusterRoleBindings }}
+{{- if kindIs "invalid" $b }}{{ continue }}{{ end }}
+---
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseClusterRoleBinding
+metadata:
+  {{- include "redb.metadata" (dict "root" $ "name" $name "item" $b "wave" 2) | nindent 2 }}
+spec:
+  {{- include "redb.bindingSpec" (dict "item" $b "kind" "RedisEnterpriseClusterRole" "ctx" (printf "clusterRoleBindings.%s" $name)) | nindent 2 }}
+{{- end }}

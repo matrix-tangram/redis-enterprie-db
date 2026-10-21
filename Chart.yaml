@@ -1,0 +1,7 @@
+apiVersion: v2
+name: redis-enterprise-db
+description: Redis Enterprise databases, users, ACLs, roles, role bindings and Ingress as custom resources, for GitOps tools such as ArgoCD
+type: application
+version: 0.1.0
+# Tested with the Redis Enterprise operator chart 8.2.0-18 and External Secrets Operator 2.13.0
+appVersion: "8.2.0-18"

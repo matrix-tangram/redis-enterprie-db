@@ -1,0 +1,41 @@
+{{- range $name, $db := .Values.databases }}
+{{- if kindIs "invalid" $db }}{{ continue }}{{ end }}{{/* null in an overlay removes the entry */}}
+{{- $spec := deepCopy ($db.spec | default dict) }}
+{{- if not $spec.redisEnterpriseCluster }}{{ $_ := set $spec "redisEnterpriseCluster" (dict "name" $.Values.clusterName) }}{{ end }}
+---
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseDatabase
+metadata:
+  {{- include "redb.metadata" (dict "root" $ "name" $name "item" $db "wave" 0) | nindent 2 }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- $ing := $db.ingress | default dict }}
+{{- if $ing.enabled }}
+{{- if not $ing.host }}{{ fail (printf "databases.%s.ingress.host is required" $name) }}{{ end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $ing.name | default $name }}
+  labels:
+    {{- include "redb.labels" $ | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    {{- with merge (deepCopy ($ing.annotations | default dict)) ($.Values.ingressDefaults.annotations | default dict) }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ $ing.className | default $.Values.ingressDefaults.className }}
+  rules:
+    - host: {{ $ing.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $name }}
+                port:
+                  {{- toYaml ($ing.servicePort | default (dict "name" "redis")) | nindent 18 }}
+{{- end }}
+{{- end }}
